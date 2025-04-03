@@ -1,0 +1,75 @@
+version: '3'
+
+vars:
+  GOP:
+    sh: go env GOPATH
+  VERSION_TAG:
+    sh: git describe --tags --always
+  VERSION_VERSION:
+    sh: git log --date=iso --pretty=format:%cd -1
+  VERSION_COMPILE:
+    sh: date +"%F %T %z by $(go version)"
+  VERSION_BRANCH:
+    sh: git rev-parse --abbrev-ref HEAD
+  GCFLAGS: -gcflags=all=-trimpath={{.GOP}}
+  LDFLAGS: -ldflags="-s -w -X 'main.Version={{.VERSION_TAG}}' -X 'main.Compile={{.VERSION_COMPILE}}' -X 'main.Branch={{.VERSION_BRANCH}}'"
+
+tasks:
+
+  syscheck:
+    desc: "Check if dependency requirements for dev"
+    silent: true
+    cmds:
+      - |
+        command -v go >/dev/null || { 
+          echo "ERROR: Go is not installed.";
+          echo "Please install Go 1.24 or later from https://golang.org/dl/ and ensure your PATH includes the Go binary.";
+          exit 1;
+        }
+
+      - |
+        go_version=$(go version | awk '{print $3}' | sed 's/go//') &&
+        required_version="1.24" &&
+        if [[ "$go_version" != "$required_version"* ]]; then
+          echo "ERROR: Go version $required_version is required, but found $go_version.";
+          echo "Please upgrade your Go installation. Ref https://golang.org/dl/";
+          exit 1;
+        else
+          echo "- Go version $go_version is OK.";
+        fi
+      - |
+        command -v docker >/dev/null || { 
+          echo "ERROR: docker is not installed.";
+          echo "Please install Docker. Ref https://docs.docker.com/engine/install/";
+          exit 1;
+        }
+      - echo "- Docker is installed."
+      - |
+        command -v npm >/dev/null || { 
+          echo "ERROR: npm is not installed.";
+          echo "Please install Node.js and npm. Ref https://nodejs.org/en/download/ and ensure your PATH includes the npm binary.";
+          exit 1;
+        }
+      - echo "- NPM is installed."
+      - |
+        command -v brotli >/dev/null || { 
+          echo "ERROR: Brotli compressor is not installed.";
+          echo "Please install brotli (e.g., on Ubuntu: sudo apt-get install brotli) and ensure your PATH includes the brotli binary.";
+          exit 1;
+        }
+      - echo "- Brotli is installed"
+      - echo "All required software is installed!"
+
+  meka:linux:
+    desc: Build mechanium for Linux
+    silent: true
+    env:
+      GOOS: linux
+      GOARCH: amd64
+    cmds:
+      - |
+        echo "- Building for Linux..."
+        echo "- Version: {{.VERSION_VERSION}}"
+        echo "- Compiled on: {{.VERSION_COMPILE}}"
+        echo "- Branch: {{.VERSION_BRANCH}}"
+      - go build {{.GCFLAGS}} {{.LDFLAGS}} -o bin/mechanium ./cmd/...
